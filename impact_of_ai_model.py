@@ -415,7 +415,7 @@ for i in class_cols_order:
 
 with open('Regression_model.pkl', 'wb') as f:
     pickle.dump({
-        "model": Regression_models["RF"],
+        "model": Regression_models["LR"],
         'scaler': reg_scaler,
         'scaled_cols': reg_numerical_data,
         'label_encoder': general_map,
@@ -431,3 +431,85 @@ for i in reg_cols_order:
     if i not in existing_features:
         print(i)
 
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import accuracy_score, f1_score, r2_score, mean_squared_error
+from sklearn.model_selection import train_test_split
+
+# ==========================================
+# 1. Recreate Test Sets
+# ==========================================
+# We must re-split the data using your original random_state (58)
+# because x_test/y_test were overwritten during the notebook run.
+
+# Classification Test Set
+_, x_test_class, _, y_test_class = train_test_split(class_x, class_y, test_size=0.3, random_state=58)
+x_test_class[numerical_data] = class_scaler.transform(x_test_class[numerical_data])
+
+# Regression Test Set
+_, x_test_reg, _, y_test_reg = train_test_split(reg_x, reg_y, test_size=0.3, random_state=58)
+x_test_reg[reg_numerical_data] = reg_scaler.transform(x_test_reg[reg_numerical_data])
+
+
+# ==========================================
+# 2. Gather Classification Metrics
+# ==========================================
+class_results = []
+for name, model in class_models.items():
+    preds = model.predict(x_test_class)
+    acc = accuracy_score(y_test_class, preds)
+    f1 = f1_score(y_test_class, preds, average='macro')
+    class_results.append({'Model': name, 'Accuracy': acc, 'F1 Score (Macro)': f1})
+
+df_class_results = pd.DataFrame(class_results).sort_values(by='Accuracy', ascending=False)
+
+
+# ==========================================
+# 3. Gather Regression Metrics
+# ==========================================
+reg_results = []
+for name, model in Regression_models.items():
+    preds = model.predict(x_test_reg)
+    r2 = r2_score(y_test_reg, preds)
+    rmse = np.sqrt(mean_squared_error(y_test_reg, preds))
+    reg_results.append({'Model': name, 'R2 Score': r2, 'RMSE': rmse})
+
+df_reg_results = pd.DataFrame(reg_results).sort_values(by='R2 Score', ascending=False)
+
+
+# ==========================================
+# 4. Display Tables and Visualizations
+# ==========================================
+sns.set_theme(style="whitegrid")
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+# Plot Classification Accuracy
+sns.barplot(data=df_class_results, x='Model', y='Accuracy', ax=axes[0], palette='viridis')
+axes[0].set_title('Classification Models (Target: Burnout Risk)', fontsize=14, fontweight='bold')
+axes[0].set_ylabel('Accuracy (Higher is Better)')
+axes[0].set_ylim(0, 1)
+for container in axes[0].containers:
+    axes[0].bar_label(container, fmt='%.3f', padding=3)
+
+# Plot Regression R2 Score
+sns.barplot(data=df_reg_results, x='Model', y='R2 Score', ax=axes[1], palette='magma')
+axes[1].set_title('Regression Models (Target: Post-Semester GPA)', fontsize=14, fontweight='bold')
+axes[1].set_ylabel('R2 Score (Higher is Better)')
+axes[1].set_ylim(0, 1)
+for container in axes[1].containers:
+    axes[1].bar_label(container, fmt='%.3f', padding=3)
+
+plt.tight_layout()
+plt.show()
+
+print("\n" + "="*50)
+print("   CLASSIFICATION SUMMARY (Target: Burnout Risk)")
+print("="*50)
+print(df_class_results.to_string(index=False))
+
+print("\n" + "="*50)
+print("   REGRESSION SUMMARY (Target: Post-Semester GPA)")
+print("="*50)
+print(df_reg_results.to_string(index=False))
